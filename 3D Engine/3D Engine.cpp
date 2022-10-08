@@ -25,8 +25,6 @@ public:
 	 }
 private:
 
-	mesh meshCube;//skematiko za kvadrat
-	matrix4x4 matrixcProj;
 
 	float fTheta;
 
