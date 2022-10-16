@@ -1,6 +1,10 @@
 ﻿#include <iostream>
 #include "CGE.h"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
 using namespace std;
+
 
 struct vec3d
 {
@@ -19,6 +23,41 @@ struct triangle
 struct mesh
 {
 	vector<triangle> tris;
+
+	bool LoadFromObjectFile(string sFileName) {
+		
+		ifstream f(sFileName);
+		if (!f.is_open())
+			return false;
+
+		vector<vec3d> verts;
+
+		while (!f.eof()) {
+			char line[128];
+			f.getline(line, 128);
+
+			std::stringstream s;
+			s << line;
+
+			char junk;
+
+			if (line[0] == 'v') {
+				vec3d v;
+				s >> junk >> v.x >> v.y >> v.z;
+				verts.push_back(v);
+			}
+
+			if (line[0] == 'f') {
+				int f[3];
+
+				s >> junk >> f[0] >> f[1] >> f[2];
+				tris.push_back({ verts[f[0] - 1], verts[f[1] - 1], verts[f[2] - 1] });
+			}
+			
+		}
+
+		return true;
+	}
 };
 
 struct mat4x4
@@ -103,7 +142,7 @@ private:
 			break;
 		case 12: 
 			bg_col = BG_GREY; fg_col = FG_WHITE; sym = PIXEL_SOLID; 
-			break;
+break;
 		default:
 			bg_col = BG_BLACK; fg_col = FG_BLACK; sym = PIXEL_SOLID;
 		}
@@ -117,33 +156,8 @@ private:
 public:
 	bool OnUserCreate() override
 	{
-		meshCube.tris = {
-
-			//JUG
-			{ 0.0f, 0.0f, 0.0f,    0.0f, 1.0f, 0.0f,    1.0f, 1.0f, 0.0f },
-			{ 0.0f, 0.0f, 0.0f,    1.0f, 1.0f, 0.0f,    1.0f, 0.0f, 0.0f },
-
-			//VZHOD
-			{ 1.0f, 0.0f, 0.0f,    1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f },
-			{ 1.0f, 0.0f, 0.0f,    1.0f, 1.0f, 1.0f,    1.0f, 0.0f, 1.0f },
-
-			//SEVER                                                     
-			{ 1.0f, 0.0f, 1.0f,    1.0f, 1.0f, 1.0f,    0.0f, 1.0f, 1.0f },
-			{ 1.0f, 0.0f, 1.0f,    0.0f, 1.0f, 1.0f,    0.0f, 0.0f, 1.0f },
-
-			//ZAHOD                                                      
-			{ 0.0f, 0.0f, 1.0f,    0.0f, 1.0f, 1.0f,    0.0f, 1.0f, 0.0f },
-			{ 0.0f, 0.0f, 1.0f,    0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f },
-
-			//ZGORNJE                                                       
-			{ 0.0f, 1.0f, 0.0f,    0.0f, 1.0f, 1.0f,    1.0f, 1.0f, 1.0f },
-			{ 0.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f,    1.0f, 1.0f, 0.0f },
-
-			//SPODNJE                                                    
-			{ 1.0f, 0.0f, 1.0f,    0.0f, 0.0f, 1.0f,    0.0f, 0.0f, 0.0f },
-			{ 1.0f, 0.0f, 1.0f,    0.0f, 0.0f, 0.0f,    1.0f, 0.0f, 0.0f },
-
-		};
+		
+		meshCube.LoadFromObjectFile("tomos.obj");
 
 		float fNear = 0.1f;
 		float fFar = 1000.0f;
@@ -184,6 +198,8 @@ public:
 		matRotX.m[2][2] = cosf(fTheta * 0.5f);
 		matRotX.m[3][3] = 1;
 
+		vector<triangle> vecTrianglesToRaster;
+
 		//Nariši trikotnike
 		for (auto tri : meshCube.tris)
 		{
@@ -201,9 +217,9 @@ public:
 
 			//Odmik v zaslon
 			triTranslated = triRotatedZX;
-			triTranslated.p[0].z = triRotatedZX.p[0].z + 3.0f;
-			triTranslated.p[1].z = triRotatedZX.p[1].z + 3.0f;
-			triTranslated.p[2].z = triRotatedZX.p[2].z + 3.0f;
+			triTranslated.p[0].z = triRotatedZX.p[0].z + 200.0f;
+			triTranslated.p[1].z = triRotatedZX.p[1].z + 200.0f;
+			triTranslated.p[2].z = triRotatedZX.p[2].z + 200.0f;
 
 			vec3d normal, line1, line2;
 			line1.x = triTranslated.p[1].x - triTranslated.p[0].x;
@@ -256,15 +272,29 @@ public:
 			   triProjected.p[2].x *= 0.5f * (float)ScreenWidth();
 			   triProjected.p[2].y *= 0.5f * (float)ScreenHeight();
 
-			   //Rasteriziraj trikotnik
-			   FillTriangle(triProjected.p[0].x, triProjected.p[0].y,
-				   triProjected.p[1].x, triProjected.p[1].y,
-				   triProjected.p[2].x, triProjected.p[2].y,
-				   triProjected.sym, triProjected.col);
+			   //Shrani trikotnike za sortirat
+			   vecTrianglesToRaster.push_back(triProjected);
 
 
 			}
 			
+		}
+
+		//Sortira trikotnike od zadaj do spredaj
+		sort(vecTrianglesToRaster.begin(), vecTrianglesToRaster.end(), [](triangle& t1, triangle& t2) {
+
+			float z1 = (t1.p[0].z + t1.p[1].z + t1.p[2].z) / 3.0f;
+			float z2 = (t2.p[0].z + t2.p[1].z + t2.p[2].z) / 3.0f;
+			return z1 > z2;
+		});
+
+
+		for (auto &triProjected : vecTrianglesToRaster) {
+			//Rasteriziraj trikotnik
+			FillTriangle(triProjected.p[0].x, triProjected.p[0].y,
+				triProjected.p[1].x, triProjected.p[1].y,
+				triProjected.p[2].x, triProjected.p[2].y,
+				triProjected.sym, triProjected.col);
 		}
 
 
