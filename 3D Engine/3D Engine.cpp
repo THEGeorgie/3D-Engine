@@ -309,9 +309,8 @@ int main()
 	int Vsync = 144;
 
 	
-
 	engine en;
-	if (en.ConstructConsole(256, 240, 4, 4))
+	if (en.ConstructConsole(256, 180, 4, 4))
 		en.Start();
 	return 0;
 }
